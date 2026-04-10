@@ -1,4 +1,20 @@
 import OpenAI from 'openai';
+import pool from '../db/pool.js';
+
+/**
+ * Get active judge criteria from database
+ */
+async function getJudgeCriteria() {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM judge_criteria WHERE is_active = true ORDER BY weight DESC, name ASC'
+    );
+    return result.rows;
+  } catch (err) {
+    console.error('Error fetching judge criteria:', err.message);
+    return null;
+  }
+}
 
 // LM Studio client (OpenAI-compatible)
 function getLMStudioClient() {
@@ -124,8 +140,29 @@ export async function runCompletion({ provider, model, messages, temperature = 0
 /**
  * Run the AI Judge: sends both outputs to a judge model for analysis
  */
-export async function runJudge({ judgeProvider, judgeModel, promptText, outputA, outputB, modelAName, modelBName }) {
-  const judgePrompt = `Tu és um avaliador especialista em qualidade de outputs de modelos de IA. 
+export async function runJudge({ judgeProvider, judgeModel, promptText, outputA, outputB, modelAName, modelBName, criteria = null }) {
+  // Get criteria from DB if not provided
+  if (!criteria) {
+    criteria = await getJudgeCriteria();
+  }
+
+  // Default criteria if DB returns nothing
+  if (!criteria || criteria.length === 0) {
+    criteria = [
+      { name: 'Relevância', description: 'Quão bem responde ao pedido', weight: 2 },
+      { name: 'Qualidade', description: 'Clareza, profundidade e utilidade', weight: 2 },
+      { name: 'Criatividade', description: 'Originalidade e abordagem', weight: 1 },
+      { name: 'Precisão', description: 'Exatidão factual e técnica', weight: 2 },
+      { name: 'Tom/Estilo', description: 'Adequação ao contexto', weight: 1 },
+    ];
+  }
+
+  // Build criteria section for prompt
+  const criteriaSection = criteria.map((c, i) =>
+    `${i + 1}. **${c.name}**${c.description ? ` — ${c.description}` : ''} (peso: ${c.weight})`
+  ).join('\n');
+
+  const judgePrompt = `Tu és um avaliador especialista em qualidade de outputs de modelos de IA.
 Analisa as duas respostas abaixo para o mesmo prompt e dá uma avaliação detalhada.
 
 ## Prompt Original:
@@ -138,12 +175,8 @@ ${outputA}
 ${outputB}
 
 ## Instruções de Avaliação:
-Avalia cada resposta nos seguintes critérios (1-10):
-1. **Relevância** — Quão bem responde ao pedido
-2. **Qualidade** — Clareza, profundidade e utilidade
-3. **Criatividade** — Originalidade e abordagem
-4. **Precisão** — Exatidão factual e técnica
-5. **Tom/Estilo** — Adequação ao contexto
+Avalia cada resposta nos seguintes critérios:
+${criteriaSection}
 
 Para cada modelo, indica:
 - ✅ Pontos positivos

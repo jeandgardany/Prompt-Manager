@@ -49,6 +49,12 @@ export const getDualRuns = (promptId, limit = 20, offset = 0) =>
 export const getDualRun = (id) => request(`/dual-runs/${id}`);
 export const setDualRunWinner = (id, data) => request(`/dual-runs/${id}/winner`, { method: 'PUT', body: JSON.stringify(data) });
 
+// Judge Criteria
+export const getJudgeCriteria = () => request('/judge-criteria');
+export const createJudgeCriteria = (data) => request('/judge-criteria', { method: 'POST', body: JSON.stringify(data) });
+export const updateJudgeCriteria = (id, data) => request(`/judge-criteria/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteJudgeCriteria = (id) => request(`/judge-criteria/${id}`, { method: 'DELETE' });
+
 // Models
 export const getModels = (provider) => request(`/models/${provider}`);
 export const getAllModels = () => request('/models');

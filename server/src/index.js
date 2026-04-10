@@ -17,14 +17,22 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || 'localhost';
 
-// Rate limiting - 100 requests per 15 minutes per IP
-const limiter = rateLimit({
+// Rate limiting — general: 200 req/15min, LLM routes: 30 req/15min
+const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => req.path === '/api/health',
   message: { error: 'Too many requests, please try again later.' },
+});
+
+const llmLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many LLM requests, please try again later.' },
 });
 
 // CORS configuration - restrictive by default
@@ -88,7 +96,7 @@ app.use(helmet({
   contentSecurityPolicy: false, // Disable for API compatibility
 }));
 app.use(cors(corsOptions));
-app.use(limiter);
+app.use(generalLimiter);
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(validateJson);
@@ -112,7 +120,7 @@ app.use('/api', apiKeyAuth);
 // Routes
 app.use('/api/agents', agentsRouter);
 app.use('/api/prompts', promptsRouter);
-app.use('/api/test', testRouter);
+app.use('/api/test', llmLimiter, testRouter);
 app.use('/api/models', modelsRouter);
 app.use('/api/dual-runs', dualRunResultsRouter);
 app.use('/api/judge-criteria', judgeCriteriaRouter);

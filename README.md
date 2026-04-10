@@ -145,16 +145,19 @@ Ao expor o servidor em `0.0.0.0`, será exibido um aviso de segurança no consol
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
 | GET | `/api/health` | Verificação de saúde da API |
-| GET/POST | `/api/agents` | Gestão de agentes |
-| GET/POST/PUT/DELETE | `/api/prompts` | Gestão de prompts |
+| GET/POST/PUT/DELETE | `/api/agents` | Gestão de agentes (CRUD) |
+| GET/POST/PUT/DELETE | `/api/prompts` | Gestão de prompts (CRUD) |
 | GET | `/api/prompts/:id/versions` | Histórico de versões |
+| GET | `/api/prompts/search/query?q=` | Pesquisa de prompts |
+| GET | `/api/prompts/export/all` | Exportar todos os prompts |
+| POST | `/api/prompts/import/all` | Importar prompts |
 | POST | `/api/test/run` | Executar teste |
 | GET | `/api/test/runs` | Listar testes (paginado) |
 | POST | `/api/test/dual-run` | Duelo de modelos |
-| GET | `/api/dual-runs` | Histórico de duelos |
+| GET | `/api/dual-runs` | Histórico de duelos (paginado) |
 | PUT | `/api/dual-runs/:id/winner` | Definir vencedor |
 | GET/POST/PUT/DELETE | `/api/judge-criteria` | Critérios do Juiz IA |
-| GET | `/api/models/:provider` | Listar modelos disponíveis |
+| GET | `/api/models/:provider` | Listar modelos (com cache 60s) |
 
 ---
 

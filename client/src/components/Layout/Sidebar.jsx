@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { getAgents } from '../../api/client';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { getAgents, createAgent } from '../../api/client';
 
 export default function Sidebar() {
   const [agents, setAgents] = useState([]);
@@ -46,7 +46,16 @@ export default function Sidebar() {
       </div>
 
       <div className="sidebar-section">
-        <div className="sidebar-section-title">Agentes</div>
+        <div className="sidebar-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Agentes
+          <NavLink
+            to="/"
+            style={{ fontSize: 16, textDecoration: 'none', color: 'var(--text-muted)', lineHeight: 1 }}
+            title="Novo Agente"
+          >
+            +
+          </NavLink>
+        </div>
         <ul className="sidebar-nav">
           {agents.map((agent) => (
             <li key={agent.id}>

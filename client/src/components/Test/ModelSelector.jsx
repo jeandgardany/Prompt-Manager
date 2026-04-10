@@ -1,22 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getModels } from '../../api/client';
 
-/**
- * Provider + Model selector
- */
+// Cache models per provider to avoid re-fetching on every mount
+const modelsCache = {};
+
 export default function ModelSelector({ provider, model, onProviderChange, onModelChange }) {
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const lastProvider = useRef('');
 
   useEffect(() => {
-    if (!provider) return;
+    if (!provider) {
+      setModels([]);
+      return;
+    }
+    // Skip if provider hasn't changed
+    if (provider === lastProvider.current) return;
+    lastProvider.current = provider;
+
+    // Use cache if available
+    if (modelsCache[provider]) {
+      setModels(modelsCache[provider]);
+      if (modelsCache[provider].length > 0 && !model) {
+        onModelChange(modelsCache[provider][0].id);
+      }
+      return;
+    }
+
     setLoading(true);
     setError('');
     getModels(provider)
       .then((data) => {
+        modelsCache[provider] = data;
         setModels(data);
-        // Auto-select first model if none selected
         if (data.length > 0 && !model) {
           onModelChange(data[0].id);
         }
@@ -36,17 +53,18 @@ export default function ModelSelector({ provider, model, onProviderChange, onMod
           className="input"
           value={provider}
           onChange={(e) => {
+            lastProvider.current = '';
             onProviderChange(e.target.value);
             onModelChange('');
           }}
         >
           <option value="">Selecionar...</option>
-          <option value="lmstudio">🖥️ LM Studio (Local)</option>
-          <option value="ollama">🦙 Ollama (Local)</option>
-          <option value="ollamacloud">☁️ Ollama Cloud</option>
-          <option value="minimax">Ⓜ️ MiniMax</option>
-          <option value="glm">🇨🇳 GLM (Zhipu AI)</option>
-          <option value="openrouter">🌐 OpenRouter (Gemini, GPT, Claude...)</option>
+          <option value="lmstudio">LM Studio (Local)</option>
+          <option value="ollama">Ollama (Local)</option>
+          <option value="ollamacloud">Ollama Cloud</option>
+          <option value="minimax">MiniMax</option>
+          <option value="glm">GLM (Zhipu AI)</option>
+          <option value="openrouter">OpenRouter (Gemini, GPT, Claude...)</option>
         </select>
       </div>
 

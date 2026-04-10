@@ -1,16 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAgents, getPrompts, createAgent, deleteAgent } from '../api/client';
+import { getAgents, getPrompts, createAgent, updateAgent, deleteAgent, searchPrompts, exportPrompts, importPrompts } from '../api/client';
 
 export default function Dashboard({ onAgentsChange }) {
   const [agents, setAgents] = useState([]);
   const [prompts, setPrompts] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Create agent
   const [showCreate, setShowCreate] = useState(false);
   const [newAgent, setNewAgent] = useState({ name: '', description: '', icon: '', color: '#6366f1' });
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+
+  // Edit agent
+  const [editAgent, setEditAgent] = useState(null);
+  const [editData, setEditData] = useState({ name: '', description: '', icon: '', color: '' });
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  // Delete agent
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const searchTimer = useRef(null);
+
+  // Import
+  const [importResult, setImportResult] = useState(null);
+  const fileInputRef = useRef(null);
+
   const navigate = useNavigate();
 
   const loadData = () => {
@@ -28,9 +50,31 @@ export default function Dashboard({ onAgentsChange }) {
     loadData();
   }, []);
 
+  // Debounced search
+  useEffect(() => {
+    if (!searchQuery || searchQuery.trim().length < 2) {
+      setSearchResults(null);
+      return;
+    }
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const results = await searchPrompts(searchQuery.trim());
+        setSearchResults(results);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(searchTimer.current);
+  }, [searchQuery]);
+
   const handleCreateAgent = async () => {
     if (!newAgent.name) return;
     setCreating(true);
+    setCreateError('');
     try {
       await createAgent(newAgent);
       setShowCreate(false);
@@ -38,9 +82,40 @@ export default function Dashboard({ onAgentsChange }) {
       loadData();
       onAgentsChange?.();
     } catch (err) {
-      console.error(err);
+      if (err.message.includes('already exists') || err.message.includes('UNIQUE')) {
+        setCreateError('Ja existe um agente com esse nome.');
+      } else {
+        setCreateError(err.message);
+      }
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleEditAgent = (agent, e) => {
+    e.stopPropagation();
+    setEditData({ name: agent.name, description: agent.description || '', icon: agent.icon || '', color: agent.color || '#6366f1' });
+    setEditError('');
+    setEditAgent(agent);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editData.name) return;
+    setSaving(true);
+    setEditError('');
+    try {
+      await updateAgent(editAgent.id, editData);
+      setEditAgent(null);
+      loadData();
+      onAgentsChange?.();
+    } catch (err) {
+      if (err.message.includes('already exists') || err.message.includes('UNIQUE')) {
+        setEditError('Ja existe um agente com esse nome.');
+      } else {
+        setEditError(err.message);
+      }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -58,7 +133,40 @@ export default function Dashboard({ onAgentsChange }) {
     }
   };
 
+  const handleExport = async () => {
+    try {
+      const data = await exportPrompts();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `prompts-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export error:', err);
+    }
+  };
+
+  const handleImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const result = await importPrompts(data);
+      setImportResult(result.imported);
+      loadData();
+      onAgentsChange?.();
+      setTimeout(() => setImportResult(null), 5000);
+    } catch (err) {
+      console.error('Import error:', err);
+    }
+    e.target.value = '';
+  };
+
   const totalVersions = prompts.reduce((sum, p) => sum + (p.current_version || 1), 0);
+  const displayPrompts = searchResults !== null ? searchResults : prompts;
 
   if (loading) {
     return (
@@ -71,7 +179,14 @@ export default function Dashboard({ onAgentsChange }) {
   return (
     <div>
       <h1 className="page-title">Dashboard</h1>
-      <p className="page-subtitle">Visão geral dos teus agentes e prompts</p>
+      <p className="page-subtitle">Visao geral dos teus agentes e prompts</p>
+
+      {/* Import success toast */}
+      {importResult && (
+        <div className="toast toast-success">
+          Importado com sucesso: {importResult.agents} agente(s) e {importResult.prompts} prompt(s)
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-4" style={{ marginBottom: 32 }}>
@@ -85,7 +200,7 @@ export default function Dashboard({ onAgentsChange }) {
         </div>
         <div className="card stat-card">
           <div className="stat-value">{totalVersions}</div>
-          <div className="stat-label">Versões</div>
+          <div className="stat-label">Versoes</div>
         </div>
         <div className="card stat-card">
           <div className="stat-value">6</div>
@@ -96,9 +211,18 @@ export default function Dashboard({ onAgentsChange }) {
       {/* Agents */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h2 style={{ fontSize: 18, fontWeight: 700 }}>Agentes</h2>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          + Novo Agente
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary" onClick={handleExport} title="Exportar prompts">
+            Exportar
+          </button>
+          <button className="btn btn-secondary" onClick={() => fileInputRef.current?.click()} title="Importar prompts">
+            Importar
+          </button>
+          <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
+          <button className="btn btn-primary" onClick={() => { setCreateError(''); setShowCreate(true); }}>
+            + Novo Agente
+          </button>
+        </div>
       </div>
       <div className="grid grid-3">
         {agents.map((agent) => (
@@ -126,14 +250,24 @@ export default function Dashboard({ onAgentsChange }) {
                 <div className="prompt-card-name">{agent.name}</div>
                 <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{agent.description}</div>
               </div>
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={(e) => { e.stopPropagation(); setDeleteConfirm(agent); }}
-                title="Excluir agente"
-                style={{ color: 'var(--text-muted)', flexShrink: 0 }}
-              >
-                🗑️
-              </button>
+              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={(e) => handleEditAgent(agent, e)}
+                  title="Editar agente"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  ✏️
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={(e) => { e.stopPropagation(); setDeleteConfirm(agent); }}
+                  title="Excluir agente"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  🗑️
+                </button>
+              </div>
             </div>
             <div className="prompt-card-meta">
               <span className="badge badge-primary">
@@ -150,6 +284,12 @@ export default function Dashboard({ onAgentsChange }) {
         <div className="modal-overlay" onClick={() => setShowCreate(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3 className="modal-title">Criar Novo Agente</h3>
+
+            {createError && (
+              <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-md)', color: '#ef4444', fontSize: 13 }}>
+                {createError}
+              </div>
+            )}
 
             <div className="input-group" style={{ marginBottom: 16 }}>
               <label className="input-label">Nome *</label>
@@ -216,6 +356,80 @@ export default function Dashboard({ onAgentsChange }) {
         </div>
       )}
 
+      {/* Edit Agent Modal */}
+      {editAgent && (
+        <div className="modal-overlay" onClick={() => setEditAgent(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title">Editar Agente</h3>
+
+            {editError && (
+              <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-md)', color: '#ef4444', fontSize: 13 }}>
+                {editError}
+              </div>
+            )}
+
+            <div className="input-group" style={{ marginBottom: 16 }}>
+              <label className="input-label">Nome *</label>
+              <input
+                className="input"
+                value={editData.name}
+                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+              />
+            </div>
+
+            <div className="input-group" style={{ marginBottom: 16 }}>
+              <label className="input-label">Descricao</label>
+              <input
+                className="input"
+                value={editData.description}
+                onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+              <div className="input-group" style={{ flex: 1 }}>
+                <label className="input-label">Icone (emoji)</label>
+                <input
+                  className="input"
+                  value={editData.icon}
+                  onChange={(e) => setEditData({ ...editData, icon: e.target.value })}
+                  maxLength={4}
+                />
+              </div>
+              <div className="input-group" style={{ flex: 1 }}>
+                <label className="input-label">Cor</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="color"
+                    value={editData.color}
+                    onChange={(e) => setEditData({ ...editData, color: e.target.value })}
+                    style={{ width: 40, height: 36, border: 'none', background: 'none', cursor: 'pointer' }}
+                  />
+                  <input
+                    className="input"
+                    value={editData.color}
+                    onChange={(e) => setEditData({ ...editData, color: e.target.value })}
+                    placeholder="#6366f1"
+                    style={{ flex: 1 }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setEditAgent(null)}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveEdit}
+                disabled={saving || !editData.name}
+              >
+                {saving ? 'A guardar...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => !deleting && setDeleteConfirm(null)}>
@@ -244,12 +458,29 @@ export default function Dashboard({ onAgentsChange }) {
         </div>
       )}
 
-      {/* Recent prompts */}
-      {prompts.length > 0 && (
-        <>
-          <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 40, marginBottom: 16 }}>Prompts Recentes</h2>
+      {/* Search + Recent prompts */}
+      <div style={{ marginTop: 40 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700 }}>
+            {searchResults !== null ? `Resultados (${searchResults.length})` : 'Prompts Recentes'}
+          </h2>
+          <div style={{ position: 'relative', width: 280 }}>
+            <input
+              className="input"
+              placeholder="Pesquisar prompts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ paddingRight: 32 }}
+            />
+            {searching && (
+              <span className="spinner" style={{ position: 'absolute', right: 10, top: 10, width: 14, height: 14, borderWidth: 2 }} />
+            )}
+          </div>
+        </div>
+
+        {displayPrompts.length > 0 ? (
           <div className="grid grid-2">
-            {prompts.slice(0, 6).map((prompt) => (
+            {(searchResults !== null ? displayPrompts : displayPrompts.slice(0, 6)).map((prompt) => (
               <div
                 key={prompt.id}
                 className="card prompt-card"
@@ -263,15 +494,25 @@ export default function Dashboard({ onAgentsChange }) {
                 <div className="prompt-card-preview">{prompt.system_prompt}</div>
                 <div className="prompt-card-meta">
                   <span className="badge badge-accent">v{prompt.current_version}</span>
-                  {prompt.variables?.map((v) => (
+                  {prompt.variables?.slice(0, 3).map((v) => (
                     <span key={v} className="variable-tag">{`{{${v}}}`}</span>
                   ))}
+                  {prompt.variables?.length > 3 && (
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      +{prompt.variables.length - 3} mais
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
           </div>
-        </>
-      )}
+        ) : searchResults !== null ? (
+          <div className="card empty-state" style={{ padding: 32 }}>
+            <div className="empty-state-title">Nenhum resultado encontrado</div>
+            <div className="empty-state-text">Tenta com outros termos de pesquisa.</div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

@@ -1,14 +1,13 @@
 import { useLocation, Link } from 'react-router-dom';
 
-export default function Header({ agentName, promptName }) {
+export default function Header({ agentName, agentId, promptName }) {
   const location = useLocation();
-  const parts = location.pathname.split('/').filter(Boolean);
 
   const buildBreadcrumbs = () => {
     const crumbs = [{ label: 'Dashboard', path: '/' }];
 
     if (agentName) {
-      crumbs.push({ label: agentName, path: location.pathname.includes('/prompt/') ? `/agent/${parts[1]}` : null });
+      crumbs.push({ label: agentName, path: agentId ? `/agent/${agentId}` : null });
     }
     if (promptName) {
       crumbs.push({ label: promptName, path: null });

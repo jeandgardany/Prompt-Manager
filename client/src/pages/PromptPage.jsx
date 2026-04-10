@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { getPrompt, updatePrompt, getVersions, getVersion } from '../api/client';
 import PromptEditor from '../components/Editor/PromptEditor';
@@ -7,8 +7,9 @@ import VersionDiff from '../components/Versions/VersionDiff';
 import TestPanel from '../components/Test/TestPanel';
 import ABCompare from '../components/Compare/ABCompare';
 import DualModelTest from '../components/Test/DualModelTest';
+import TestHistory from '../components/Test/TestHistory';
 
-export default function PromptPage({ setAgentName, setPromptName }) {
+export default function PromptPage({ setAgentName, setAgentId, setPromptName }) {
   const { id } = useParams();
   const [prompt, setPrompt] = useState(null);
   const [versions, setVersions] = useState([]);
@@ -39,6 +40,7 @@ export default function PromptPage({ setAgentName, setPromptName }) {
       setSystemPrompt(p.system_prompt);
       setUserTemplate(p.user_prompt_template || '');
       setAgentName?.(p.agent_name);
+      setAgentId?.(p.agent_id);
       setPromptName?.(p.name);
       setHasChanges(false);
     } catch (err) {
@@ -52,6 +54,7 @@ export default function PromptPage({ setAgentName, setPromptName }) {
     loadData();
     return () => {
       setAgentName?.('');
+      setAgentId?.('');
       setPromptName?.('');
     };
   }, [id]);
@@ -103,16 +106,17 @@ export default function PromptPage({ setAgentName, setPromptName }) {
     setActiveTab('editor');
   };
 
-  // Extract variables from current editor content
-  const extractVars = (text) => {
-    const matches = (text || '').match(/\{\{(\w+)\}\}/g) || [];
-    return [...new Set(matches.map((m) => m.replace(/\{\{|\}\}/g, '')))];
-  };
-
-  const currentVariables = [
-    ...extractVars(systemPrompt),
-    ...extractVars(userTemplate),
-  ].filter((v, i, a) => a.indexOf(v) === i);
+  // Extract variables from current editor content (memoized)
+  const currentVariables = useMemo(() => {
+    const extractVars = (text) => {
+      const matches = (text || '').match(/\{\{(\w+)\}\}/g) || [];
+      return [...new Set(matches.map((m) => m.replace(/\{\{|\}\}/g, '')))];
+    };
+    return [
+      ...extractVars(systemPrompt),
+      ...extractVars(userTemplate),
+    ].filter((v, i, a) => a.indexOf(v) === i);
+  }, [systemPrompt, userTemplate]);
 
   if (loading) {
     return (
@@ -185,6 +189,9 @@ export default function PromptPage({ setAgentName, setPromptName }) {
         </button>
         <button className={`tab ${activeTab === 'duel' ? 'active' : ''}`} onClick={() => setActiveTab('duel')}>
           ⚔️ Duelo de Modelos
+        </button>
+        <button className={`tab ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+          📜 Historico
         </button>
       </div>
 
@@ -314,6 +321,10 @@ export default function PromptPage({ setAgentName, setPromptName }) {
           version={prompt.current_version}
           variables={currentVariables}
         />
+      )}
+
+      {activeTab === 'history' && (
+        <TestHistory promptId={id} />
       )}
     </div>
   );

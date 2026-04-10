@@ -13,11 +13,22 @@ router.get('/', async (req, res) => {
       query += ' WHERE prompt_id = $1';
       params.push(prompt_id);
     }
+    const parsedLimit = parseInt(limit);
     query += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
-    params.push(parseInt(limit), parseInt(offset));
+    params.push(parsedLimit + 1, parseInt(offset));
 
     const result = await pool.query(query, params);
-    res.json(result.rows);
+    const hasMore = result.rows.length > parsedLimit;
+    const runs = hasMore ? result.rows.slice(0, parsedLimit) : result.rows;
+
+    res.json({
+      runs,
+      pagination: {
+        limit: parsedLimit,
+        offset: parseInt(offset),
+        hasMore,
+      },
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

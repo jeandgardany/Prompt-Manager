@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAgent, getPrompts, createPrompt, deletePrompt } from '../api/client';
 
-export default function AgentPage({ setAgentName }) {
+export default function AgentPage({ setAgentName, setAgentId }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [agent, setAgent] = useState(null);
@@ -19,6 +19,7 @@ export default function AgentPage({ setAgentName }) {
         setAgent(a);
         setPrompts(p);
         setAgentName?.(a.name);
+        setAgentId?.(a.id);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -26,7 +27,7 @@ export default function AgentPage({ setAgentName }) {
 
   useEffect(() => {
     loadData();
-    return () => setAgentName?.('');
+    return () => { setAgentName?.(''); setAgentId?.(''); };
   }, [id]);
 
   const handleCreate = async () => {

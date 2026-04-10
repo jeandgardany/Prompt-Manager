@@ -8,6 +8,7 @@ import PromptPage from './pages/PromptPage';
 
 export default function App() {
   const [agentName, setAgentName] = useState('');
+  const [agentId, setAgentId] = useState('');
   const [promptName, setPromptName] = useState('');
   const [sidebarKey, setSidebarKey] = useState(0);
 
@@ -17,14 +18,14 @@ export default function App() {
     <div className="app-layout">
       <Sidebar key={sidebarKey} />
       <div className="main-content">
-        <Header agentName={agentName} promptName={promptName} />
+        <Header agentName={agentName} agentId={agentId} promptName={promptName} />
         <div className="page-content">
           <Routes>
             <Route path="/" element={<Dashboard onAgentsChange={refreshSidebar} />} />
-            <Route path="/agent/:id" element={<AgentPage setAgentName={setAgentName} />} />
+            <Route path="/agent/:id" element={<AgentPage setAgentName={setAgentName} setAgentId={setAgentId} />} />
             <Route
               path="/prompt/:id"
-              element={<PromptPage setAgentName={setAgentName} setPromptName={setPromptName} />}
+              element={<PromptPage setAgentName={setAgentName} setAgentId={setAgentId} setPromptName={setPromptName} />}
             />
           </Routes>
         </div>

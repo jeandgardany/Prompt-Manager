@@ -26,6 +26,13 @@ export const createPrompt = (data) => request('/prompts', { method: 'POST', body
 export const updatePrompt = (id, data) => request(`/prompts/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deletePrompt = (id) => request(`/prompts/${id}`, { method: 'DELETE' });
 
+// Search
+export const searchPrompts = (q) => request(`/prompts/search/query?q=${encodeURIComponent(q)}`);
+
+// Export / Import
+export const exportPrompts = () => request('/prompts/export/all');
+export const importPrompts = (data) => request('/prompts/import/all', { method: 'POST', body: JSON.stringify(data) });
+
 // Versions
 export const getVersions = (promptId) => request(`/prompts/${promptId}/versions`);
 export const getVersion = (promptId, version) => request(`/prompts/${promptId}/versions/${version}`);

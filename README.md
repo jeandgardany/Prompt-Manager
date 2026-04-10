@@ -21,6 +21,16 @@ A aplicação está dividida num **Backend robusto** alimentado por Node.js/Expr
 - **Inputs Multimodais**: Faça o upload de Imagens localmente para testar modelos de Visão e extração de dados.
 - **Resultados Persistidos**: Todos os duelos são guardados na base de dados para consulta posterior.
 
+### 🧠 Controlo de Thinking (Chain-of-Thought)
+- **Toggle ON/OFF**: Ative ou desative o raciocínio interno (thinking/CoT) de modelos de raciocínio diretamente na interface, tanto no teste simples como no duelo.
+- **Modelos suportados**: Qwen3/3.5, QwQ, DeepSeek, Gemma 3/4, e outros modelos que produzam blocos `<think>`.
+- **Supressão inteligente**: Quando desativado, o sistema usa a diretiva nativa `/no_think` para Qwen, `reasoning_effort: none` para DeepSeek, e remove automaticamente blocos `<think>` do output final como fallback universal.
+- **Ideal para produção**: Obtenha respostas limpas sem o bloco de raciocínio quando não precisa dele (ex: reescrita de artigos, geração de conteúdo).
+
+### ⚙️ Controlo de Max Tokens
+- **Limite configurável**: Ajuste o número máximo de tokens na resposta (default: 4096) diretamente na interface antes de cada teste ou duelo.
+- **Sem respostas cortadas**: Para conteúdos longos (artigos, relatórios), aumente o limite até 32768 tokens conforme necessário.
+
 ### 🧑‍⚖️ Juiz IA (Avaliação Automática)
 - Precisa de uma opinião imparcial sobre quem respondeu melhor no Duelo Lado-a-Lado? Invoque o botão **"Avaliar com IA"**.
 - Escolha um dos seus modelos mais inteligentes (via OpenRouter por exemplo) para ler ambos os *outputs* (Modelo A vs Modelo B) com base na instrução original.
@@ -151,9 +161,9 @@ Ao expor o servidor em `0.0.0.0`, será exibido um aviso de segurança no consol
 | GET | `/api/prompts/search/query?q=` | Pesquisa de prompts |
 | GET | `/api/prompts/export/all` | Exportar todos os prompts |
 | POST | `/api/prompts/import/all` | Importar prompts |
-| POST | `/api/test/run` | Executar teste |
+| POST | `/api/test/run` | Executar teste (suporta `maxTokens`, `thinkingEnabled`) |
 | GET | `/api/test/runs` | Listar testes (paginado) |
-| POST | `/api/test/dual-run` | Duelo de modelos |
+| POST | `/api/test/dual-run` | Duelo de modelos (suporta `maxTokens`, `thinkingEnabled`) |
 | GET | `/api/dual-runs` | Histórico de duelos (paginado) |
 | PUT | `/api/dual-runs/:id/winner` | Definir vencedor |
 | GET/POST/PUT/DELETE | `/api/judge-criteria` | Critérios do Juiz IA |

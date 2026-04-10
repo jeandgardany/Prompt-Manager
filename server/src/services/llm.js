@@ -1,0 +1,252 @@
+import OpenAI from 'openai';
+
+// LM Studio client (OpenAI-compatible)
+function getLMStudioClient() {
+  return new OpenAI({
+    baseURL: process.env.LM_STUDIO_URL || 'http://192.168.1.20:12345/v1',
+    apiKey: 'not-needed',
+    timeout: 120000,
+  });
+}
+
+// GLM (Zhipu AI BigModel) client (OpenAI-compatible)
+function getGLMClient() {
+  return new OpenAI({
+    baseURL: process.env.GLM_API_URL || 'https://api.z.ai/api/coding/paas/v4',
+    apiKey: process.env.GLM_API_KEY,
+    timeout: 120000,
+  });
+}
+
+// OpenRouter client (for AI Judge + extra models)
+function getOpenRouterClient() {
+  return new OpenAI({
+    baseURL: process.env.OPENROUTER_URL || 'https://openrouter.ai/api/v1',
+    apiKey: process.env.OPENROUTER_API_KEY,
+    timeout: 120000,
+    defaultHeaders: {
+      'HTTP-Referer': 'http://localhost:5173',
+      'X-Title': 'Prompt Manager',
+    },
+  });
+}
+
+// Ollama Local client
+function getOllamaClient() {
+  return new OpenAI({
+    baseURL: process.env.OLLAMA_URL || 'http://localhost:11434/v1',
+    apiKey: 'ollama', // not required but passed for safety
+    timeout: 120000,
+  });
+}
+
+// Ollama Cloud client
+function getOllamaCloudClient() {
+  return new OpenAI({
+    baseURL: process.env.OLLAMA_CLOUD_URL || 'https://api.ollama.cloud/v1',
+    apiKey: process.env.OLLAMA_CLOUD_API_KEY || 'ollama',
+    timeout: 120000,
+  });
+}
+
+// Minimax client
+function getMinimaxClient() {
+  return new OpenAI({
+    baseURL: process.env.MINIMAX_API_URL || 'https://api.minimax.io/v1',
+    apiKey: process.env.MINIMAX_API_KEY,
+    timeout: 120000,
+  });
+}
+
+/**
+ * Get client for a given provider
+ */
+function getClient(provider) {
+  switch (provider) {
+    case 'lmstudio': return getLMStudioClient();
+    case 'glm': return getGLMClient();
+    case 'openrouter': return getOpenRouterClient();
+    case 'ollama': return getOllamaClient();
+    case 'ollamacloud': return getOllamaCloudClient();
+    case 'minimax': return getMinimaxClient();
+    default: throw new Error(`Unknown provider: ${provider}`);
+  }
+}
+
+/**
+ * Run a chat completion against the chosen provider
+ */
+export async function runCompletion({ provider, model, messages, temperature = 0.7, maxTokens = 2048 }) {
+  const start = Date.now();
+  const client = getClient(provider);
+
+  try {
+    const response = await client.chat.completions.create({
+      model,
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+    });
+
+    const latency = Date.now() - start;
+    const choice = response.choices?.[0];
+
+    let finalOutput = choice?.message?.content || '';
+
+    // Some reasoning models (like DeepSeek) return the CoT in reasoning_content
+    if (choice?.message?.reasoning_content) {
+      finalOutput = `<think>\n${choice.message.reasoning_content}\n</think>\n\n${finalOutput}`;
+    }
+
+    // Se estiver vazio, vamos despejar o próprio objeto de resposta para fins de depuração
+    if (!finalOutput) {
+      finalOutput = `[DEBUG RAW RESPONSE]\n\n${JSON.stringify(response, null, 2)}`;
+    }
+
+    return {
+      output: finalOutput,
+      tokensUsed: response.usage?.total_tokens || response.eval_count || 0,
+      latencyMs: latency,
+      finishReason: choice?.finish_reason || 'unknown',
+      rawResponse: JSON.stringify(choice?.message || {}),
+    };
+  } catch (err) {
+    const latency = Date.now() - start;
+    throw {
+      message: err.message || 'LLM request failed',
+      latencyMs: latency,
+      provider,
+      model,
+    };
+  }
+}
+
+/**
+ * Run the AI Judge: sends both outputs to a judge model for analysis
+ */
+export async function runJudge({ judgeProvider, judgeModel, promptText, outputA, outputB, modelAName, modelBName }) {
+  const judgePrompt = `Tu és um avaliador especialista em qualidade de outputs de modelos de IA. 
+Analisa as duas respostas abaixo para o mesmo prompt e dá uma avaliação detalhada.
+
+## Prompt Original:
+${promptText}
+
+## Resposta do Modelo A (${modelAName}):
+${outputA}
+
+## Resposta do Modelo B (${modelBName}):
+${outputB}
+
+## Instruções de Avaliação:
+Avalia cada resposta nos seguintes critérios (1-10):
+1. **Relevância** — Quão bem responde ao pedido
+2. **Qualidade** — Clareza, profundidade e utilidade
+3. **Criatividade** — Originalidade e abordagem
+4. **Precisão** — Exatidão factual e técnica
+5. **Tom/Estilo** — Adequação ao contexto
+
+Para cada modelo, indica:
+- ✅ Pontos positivos
+- ❌ Pontos negativos
+
+No final, declara o **vencedor** e explica porquê.
+
+Responde em português.`;
+
+  const messages = [
+    { role: 'system', content: 'Tu és um juiz imparcial que avalia outputs de modelos de IA. Sê objetivo, detalhado e justo na tua análise.' },
+    { role: 'user', content: judgePrompt },
+  ];
+
+  return runCompletion({
+    provider: judgeProvider,
+    model: judgeModel,
+    messages,
+    temperature: 0.3,
+    maxTokens: 4096,
+  });
+}
+
+/**
+ * List available models from a provider
+ */
+export async function listModels(provider) {
+  try {
+    if (provider === 'lmstudio') {
+      const client = getLMStudioClient();
+      const response = await client.models.list();
+      return response.data.map((m) => ({
+        id: m.id,
+        name: m.id,
+        provider: 'lmstudio',
+      }));
+    } else if (provider === 'ollama') {
+      const client = getOllamaClient();
+      const response = await client.models.list();
+      return response.data.map((m) => ({
+        id: m.id,
+        name: m.id,
+        provider: 'ollama',
+      }));
+    } else if (provider === 'ollamacloud') {
+      const client = getOllamaCloudClient();
+      const response = await client.models.list();
+      return response.data.map((m) => ({
+        id: m.id,
+        name: m.id,
+        provider: 'ollamacloud',
+      }));
+    } else if (provider === 'minimax') {
+      return [
+        { id: 'MiniMax-M2.7', name: 'MiniMax-M2.7', provider: 'minimax' },
+        { id: 'MiniMax-M2.5', name: 'MiniMax-M2.5', provider: 'minimax' },
+        { id: 'MiniMax-M2.5-Code', name: 'MiniMax-M2.5-Code', provider: 'minimax' },
+        { id: 'MiniMax-Text-01', name: 'MiniMax-Text-01', provider: 'minimax' },
+      ];
+    } else if (provider === 'glm') {
+      return [
+        { id: 'glm-4.6', name: 'GLM-4.6', provider: 'glm' },
+        { id: 'glm-4.7', name: 'GLM-4.7', provider: 'glm' },
+        { id: 'glm-5', name: 'GLM-5', provider: 'glm' },
+        { id: 'glm-5-Turbo', name: 'GLM-5-Turbo', provider: 'glm' },
+        { id: 'glm-5.1', name: 'GLM-5.1', provider: 'glm' },
+      ];
+    } else if (provider === 'openrouter') {
+      return [
+        { id: 'qwen/qwen3.6-plus', name: 'Qwen 3.6 Plus', provider: 'openrouter' },
+        { id: 'google/gemma-4-31b-it', name: 'Gemma 4 31B IT (Pago)', provider: 'openrouter' },
+        { id: 'google/gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', provider: 'openrouter' },
+        { id: 'google/gemini-3.1-flash-lite-preview', name: 'Gemini 3.1 Flash Lite Preview', provider: 'openrouter' },
+        { id: 'qwen/qwen3.5-flash-02-23', name: 'Qwen 3.5 Flash 02-23', provider: 'openrouter' },
+        { id: 'minimax/minimax-m2.5:free', name: 'MiniMax M2.5 (Free)', provider: 'openrouter' },
+        { id: 'google/gemma-3-27b-it:free', name: 'Gemma 3 27B IT (Free)', provider: 'openrouter' },
+        { id: 'google/gemma-3n-e4b-it:free', name: 'Gemma 3N E4B IT (Free)', provider: 'openrouter' },
+        { id: 'x-ai/grok-4.1-fast', name: 'Grok 4.1-Fast', provider: 'openrouter' },
+        { id: 'openai/gpt-5-nano', name: 'Gpt 5 Nano', provider: 'openrouter' },
+      ];
+    }
+    return [];
+  } catch (err) {
+    console.error(`Error listing models for ${provider}:`, err.message);
+    return [];
+  }
+}
+
+/**
+ * Interpolate variables into a prompt template
+ */
+export function interpolateVariables(template, variables = {}) {
+  if (!template) return '';
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+    return variables[key] !== undefined ? variables[key] : match;
+  });
+}
+
+/**
+ * Extract variable names from a template
+ */
+export function extractVariables(template) {
+  if (!template) return [];
+  const matches = template.match(/\{\{(\w+)\}\}/g) || [];
+  return [...new Set(matches.map((m) => m.replace(/\{\{|\}\}/g, '')))];
+}

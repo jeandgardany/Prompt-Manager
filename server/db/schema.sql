@@ -1,0 +1,82 @@
+-- ===========================================
+-- Prompt Manager - Database Schema
+-- ===========================================
+
+-- Agentes (bots)
+CREATE TABLE IF NOT EXISTS agents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    icon VARCHAR(10) DEFAULT '🤖',
+    color VARCHAR(7) DEFAULT '#6366f1',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Prompts (current versions)
+CREATE TABLE IF NOT EXISTS prompts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_id UUID REFERENCES agents(id) ON DELETE CASCADE,
+    name VARCHAR(200) NOT NULL,
+    system_prompt TEXT NOT NULL,
+    user_prompt_template TEXT DEFAULT '',
+    current_version INT DEFAULT 1,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Version history (immutable)
+CREATE TABLE IF NOT EXISTS prompt_versions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    prompt_id UUID REFERENCES prompts(id) ON DELETE CASCADE,
+    version INT NOT NULL,
+    system_prompt TEXT NOT NULL,
+    user_prompt_template TEXT DEFAULT '',
+    change_note TEXT DEFAULT 'Versão inicial',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(prompt_id, version)
+);
+
+-- Test runs
+CREATE TABLE IF NOT EXISTS test_runs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    prompt_id UUID REFERENCES prompts(id) ON DELETE SET NULL,
+    prompt_version_id UUID REFERENCES prompt_versions(id) ON DELETE SET NULL,
+    version_number INT,
+    provider VARCHAR(50) NOT NULL,
+    model VARCHAR(200) NOT NULL,
+    variables JSONB DEFAULT '{}',
+    input_messages JSONB NOT NULL,
+    output TEXT NOT NULL,
+    tokens_used INT DEFAULT 0,
+    latency_ms INT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- A/B Comparisons
+CREATE TABLE IF NOT EXISTS ab_comparisons (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    prompt_id UUID REFERENCES prompts(id) ON DELETE CASCADE,
+    version_a INT NOT NULL,
+    version_b INT NOT NULL,
+    test_run_a UUID REFERENCES test_runs(id) ON DELETE SET NULL,
+    test_run_b UUID REFERENCES test_runs(id) ON DELETE SET NULL,
+    winner VARCHAR(1),
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_prompts_agent ON prompts(agent_id);
+CREATE INDEX IF NOT EXISTS idx_versions_prompt ON prompt_versions(prompt_id);
+CREATE INDEX IF NOT EXISTS idx_test_runs_prompt ON test_runs(prompt_id);
+CREATE INDEX IF NOT EXISTS idx_test_runs_version ON test_runs(prompt_version_id);
+CREATE INDEX IF NOT EXISTS idx_ab_prompt ON ab_comparisons(prompt_id);
+
+-- Seed agents
+INSERT INTO agents (name, description, icon, color) VALUES
+    ('AIA', 'Assistente Inteligente de Atendimento', '🧠', '#6366f1'),
+    ('DAIA', 'Digital AI Assistant', '⚡', '#8b5cf6'),
+    ('Blogs', 'Gerador de conteúdo para blogs', '✍️', '#14b8a6')
+ON CONFLICT (name) DO NOTHING;

@@ -70,6 +70,18 @@ export default function Sidebar() {
             LM Studio
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b' }} />
+            Ollama (Local)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#38bdf8' }} />
+            Ollama Cloud
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#a78bfa' }} />
+            MiniMax
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent-400)' }} />
             GLM (Zhipu AI)
           </div>

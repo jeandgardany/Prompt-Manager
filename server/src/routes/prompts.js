@@ -125,7 +125,7 @@ router.put('/:id', async (req, res) => {
         user_prompt_template = $2,
         name = COALESCE($3, name),
         current_version = $4,
-        updated_at = NOW()
+        updated_at = datetime('now')
        WHERE id = $5 RETURNING *`,
       [system_prompt, user_prompt_template || '', name, newVersion, req.params.id]
     );

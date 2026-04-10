@@ -59,7 +59,7 @@ router.put('/:id', async (req, res) => {
         description = COALESCE($2, description),
         icon = COALESCE($3, icon),
         color = COALESCE($4, color),
-        updated_at = NOW()
+        updated_at = datetime('now')
        WHERE id = $5 RETURNING *`,
       [name, description, icon, color, req.params.id]
     );

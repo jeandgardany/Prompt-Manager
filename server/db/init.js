@@ -2,34 +2,26 @@ import 'dotenv/config';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import pg from 'pg';
+import Database from 'better-sqlite3';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const dbPath = process.env.DB_PATH || join(__dirname, 'database.sqlite');
 
-async function initDB() {
-  const pool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: false,
-  });
+function initDB() {
+  console.log('🔌 Connecting to SQLite...');
 
-  try {
-    console.log('🔌 Connecting to PostgreSQL...');
-    const client = await pool.connect();
-    console.log('✅ Connected!');
+  const db = new Database(dbPath);
+  console.log('✅ Connected!');
 
-    const schema = readFileSync(join(__dirname, 'schema.sql'), 'utf8');
-    console.log('📋 Running schema...');
-    await client.query(schema);
-    console.log('✅ Schema created successfully!');
-    console.log('🌱 Seed data inserted (agents: AIA, DAIA, Blogs)');
+  const schema = readFileSync(join(__dirname, 'schema.sql'), 'utf8');
 
-    client.release();
-  } catch (err) {
-    console.error('❌ Error initializing database:', err.message);
-    process.exit(1);
-  } finally {
-    await pool.end();
-  }
+  console.log('📋 Running schema...');
+  db.exec(schema);
+  console.log('✅ Schema created successfully!');
+  console.log('🌱 Seed data inserted (agents: AIA, DAIA, Blogs)');
+
+  db.close();
+  console.log('✅ Database initialized!');
 }
 
 initDB();

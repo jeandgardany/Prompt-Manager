@@ -7,7 +7,7 @@ import pool from '../db/pool.js';
 async function getJudgeCriteria() {
   try {
     const result = await pool.query(
-      'SELECT * FROM judge_criteria WHERE is_active = true ORDER BY weight DESC, name ASC'
+      'SELECT * FROM judge_criteria WHERE is_active = 1 ORDER BY weight DESC, name ASC'
     );
     return result.rows;
   } catch (err) {

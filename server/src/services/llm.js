@@ -92,17 +92,49 @@ function getClient(provider) {
 /**
  * Run a chat completion against the chosen provider
  */
-export async function runCompletion({ provider, model, messages, temperature = 0.7, maxTokens = 2048 }) {
+export async function runCompletion({ provider, model, messages, temperature = 0.7, maxTokens = 4096, thinkingEnabled = true }) {
   const start = Date.now();
   const client = getClient(provider);
+  const modelLower = (model || '').toLowerCase();
+
+  // Detect reasoning models
+  const isReasoningModel = /qwen3|qwen2\.5|deepseek|qwq|gemma-3|gemma-4|gemma3|gemma4/i.test(model);
+
+  // When thinking is disabled, modify messages to suppress CoT
+  let finalMessages = messages;
+  if (!thinkingEnabled && isReasoningModel) {
+    finalMessages = messages.map((msg, i) => {
+      if (msg.role === 'user') {
+        // Qwen3/3.5 supports /no_think directive
+        if (/qwen3|qwen2\.5|qwq/i.test(model)) {
+          const content = typeof msg.content === 'string'
+            ? `/no_think\n${msg.content}`
+            : msg.content;
+          return { ...msg, content };
+        }
+      }
+      return msg;
+    });
+  }
+
+  // Build request options
+  const requestOpts = {
+    model,
+    messages: finalMessages,
+    temperature,
+    max_tokens: maxTokens,
+  };
+
+  // Some providers support chat_template_kwargs or extra params to disable thinking
+  if (!thinkingEnabled && isReasoningModel) {
+    // OpenRouter and some providers support this
+    if (/deepseek/i.test(model)) {
+      requestOpts.reasoning_effort = 'none';
+    }
+  }
 
   try {
-    const response = await client.chat.completions.create({
-      model,
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-    });
+    const response = await client.chat.completions.create(requestOpts);
 
     const latency = Date.now() - start;
     const choice = response.choices?.[0];
@@ -111,7 +143,15 @@ export async function runCompletion({ provider, model, messages, temperature = 0
 
     // Some reasoning models (like DeepSeek) return the CoT in reasoning_content
     if (choice?.message?.reasoning_content) {
-      finalOutput = `<think>\n${choice.message.reasoning_content}\n</think>\n\n${finalOutput}`;
+      if (thinkingEnabled) {
+        finalOutput = `<think>\n${choice.message.reasoning_content}\n</think>\n\n${finalOutput}`;
+      }
+      // When thinking is disabled, we just ignore reasoning_content
+    }
+
+    // Strip <think> blocks from output when thinking is disabled
+    if (!thinkingEnabled) {
+      finalOutput = finalOutput.replace(/<think>[\s\S]*?<\/think>\s*/g, '').trim();
     }
 
     // Se estiver vazio, vamos despejar o próprio objeto de resposta para fins de depuração

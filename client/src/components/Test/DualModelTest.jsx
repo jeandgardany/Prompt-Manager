@@ -17,6 +17,8 @@ export default function DualModelTest({ promptId, version, variables = [] }) {
 
   // Variables
   const [varValues, setVarValues] = useState({});
+  const [maxTokens, setMaxTokens] = useState(4096);
+  const [thinkingEnabled, setThinkingEnabled] = useState(true);
 
   // Results
   const [result, setResult] = useState(null);
@@ -60,6 +62,8 @@ export default function DualModelTest({ promptId, version, variables = [] }) {
         modelA,
         providerB,
         modelB,
+        maxTokens,
+        thinkingEnabled,
         sequential: isSequential,
       });
       setResult(data);
@@ -260,6 +264,40 @@ export default function DualModelTest({ promptId, version, variables = [] }) {
                 +
                 <input type="file" accept="image/*" multiple onChange={handleImageUpload} style={{ display: 'none' }} />
               </label>
+            </div>
+          </div>
+
+          {/* Max Tokens + Thinking Toggle */}
+          <div style={{ display: 'flex', gap: 16, marginTop: 20, alignItems: 'flex-start' }}>
+            <div className="input-group">
+              <label className="input-label">Max Tokens</label>
+              <input
+                className="input"
+                type="number"
+                min={256}
+                max={32768}
+                step={256}
+                value={maxTokens}
+                onChange={(e) => setMaxTokens(Number(e.target.value))}
+                style={{ width: 140 }}
+              />
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                1 palavra ~ 1.3 tokens
+              </span>
+            </div>
+            <div className="input-group">
+              <label className="input-label">Thinking (CoT)</label>
+              <button
+                type="button"
+                className={`btn btn-sm ${thinkingEnabled ? 'btn-accent' : 'btn-secondary'}`}
+                onClick={() => setThinkingEnabled(!thinkingEnabled)}
+                style={{ marginTop: 2, minWidth: 80 }}
+              >
+                {thinkingEnabled ? '🧠 ON' : '🚫 OFF'}
+              </button>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                {thinkingEnabled ? 'Mostra raciocinio' : 'Sem raciocinio'}
+              </span>
             </div>
           </div>
 

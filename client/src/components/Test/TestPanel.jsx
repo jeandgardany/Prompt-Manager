@@ -10,6 +10,8 @@ export default function TestPanel({ promptId, version, variables = [] }) {
   const [provider, setProvider] = useState('');
   const [model, setModel] = useState('');
   const [varValues, setVarValues] = useState({});
+  const [maxTokens, setMaxTokens] = useState(4096);
+  const [thinkingEnabled, setThinkingEnabled] = useState(true);
   const [output, setOutput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -33,6 +35,8 @@ export default function TestPanel({ promptId, version, variables = [] }) {
         provider,
         model,
         variables: varValues,
+        maxTokens,
+        thinkingEnabled,
       });
 
       setOutput(result.output);
@@ -85,6 +89,39 @@ export default function TestPanel({ promptId, version, variables = [] }) {
             onProviderChange={setProvider}
             onModelChange={setModel}
           />
+
+          <div style={{ display: 'flex', gap: 16, marginTop: 12, alignItems: 'flex-start' }}>
+            <div className="input-group">
+              <label className="input-label">Max Tokens</label>
+              <input
+                className="input"
+                type="number"
+                min={256}
+                max={32768}
+                step={256}
+                value={maxTokens}
+                onChange={(e) => setMaxTokens(Number(e.target.value))}
+                style={{ width: 140 }}
+              />
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                1 palavra ~ 1.3 tokens
+              </span>
+            </div>
+            <div className="input-group">
+              <label className="input-label">Thinking (CoT)</label>
+              <button
+                type="button"
+                className={`btn btn-sm ${thinkingEnabled ? 'btn-accent' : 'btn-secondary'}`}
+                onClick={() => setThinkingEnabled(!thinkingEnabled)}
+                style={{ marginTop: 2, minWidth: 80 }}
+              >
+                {thinkingEnabled ? '🧠 ON' : '🚫 OFF'}
+              </button>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                {thinkingEnabled ? 'Mostra raciocinio' : 'Sem raciocinio'}
+              </span>
+            </div>
+          </div>
 
           <div style={{ marginTop: 8 }}>
             <VariablePanel

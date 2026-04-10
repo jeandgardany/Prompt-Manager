@@ -6,7 +6,7 @@ const router = Router();
 
 // POST /api/test/run - Execute a test run
 router.post('/run', async (req, res) => {
-  const { prompt_id, version, provider, model, variables, temperature, maxTokens } = req.body;
+  const { prompt_id, version, provider, model, variables, temperature, maxTokens, thinkingEnabled } = req.body;
 
   if (!prompt_id || !provider || !model) {
     return res.status(400).json({ error: 'prompt_id, provider, and model are required' });
@@ -44,7 +44,8 @@ router.post('/run', async (req, res) => {
       model,
       messages,
       temperature: temperature || 0.7,
-      maxTokens: maxTokens || 2048,
+      maxTokens: maxTokens || 4096,
+      thinkingEnabled: thinkingEnabled !== false,
     });
 
     // Get version ID for storage
@@ -228,6 +229,7 @@ router.post('/dual-run', async (req, res) => {
     providerA, modelA,
     providerB, modelB,
     temperature, maxTokens,
+    thinkingEnabled,
     sequential, // if true, run one at a time (needed for same-provider like LM Studio)
   } = req.body;
 
@@ -271,7 +273,7 @@ router.post('/dual-run', async (req, res) => {
       }
     }
 
-    const runOpts = { temperature, maxTokens };
+    const runOpts = { temperature, maxTokens, thinkingEnabled: thinkingEnabled !== false };
     const catchErr = (err) => ({ output: '', error: err.message, tokensUsed: 0, latencyMs: err.latencyMs || 0 });
 
     // Helper: wait for N ms

@@ -32,7 +32,12 @@ export const getVersion = (promptId, version) => request(`/prompts/${promptId}/v
 
 // Test
 export const runTest = (data) => request('/test/run', { method: 'POST', body: JSON.stringify(data) });
-export const getTestRuns = (promptId) => request(`/test/runs?prompt_id=${promptId}`);
+export const getTestRuns = (promptId, { limit = 20, cursor } = {}) => {
+  let url = `/test/runs?limit=${limit}`;
+  if (promptId) url += `&prompt_id=${promptId}`;
+  if (cursor) url += `&cursor=${cursor}`;
+  return request(url);
+};
 export const runCompare = (data) => request('/test/compare', { method: 'POST', body: JSON.stringify(data) });
 export const setWinner = (id, data) => request(`/test/compare/${id}/winner`, { method: 'PUT', body: JSON.stringify(data) });
 export const dualRun = (data) => request('/test/dual-run', { method: 'POST', body: JSON.stringify(data) });

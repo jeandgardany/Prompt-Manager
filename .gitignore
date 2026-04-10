@@ -3,6 +3,8 @@ dist/
 build/
 .env
 .env.*
+*.json
+!.env.example
 *.log
 .DS_Store
 coverage/

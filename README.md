@@ -35,6 +35,27 @@ A ferramenta abstrai todas as complexidades de chamadas API usando uma camada un
 4. 🇨🇳 **GLM (Zhipu AI)**: Suporte dedicado para modelos como o `GLM-4`, `GLM-5` entre outros da ZhipuAI.
 5. Ⓜ️ **MiniMax**: Suporte para APIs standard ou Code Plans (`MiniMax-M2.5-Code`, `MiniMax-M2.7`, etc).
 
+### ✏️ Como Adicionar / Modificar Modelos (OpenRouter, GLM, MiniMax)
+
+Como alguns serviços massivos (como o **OpenRouter** ou **Zhipu/GLM**) disponibilizam centenas de milhares de modelos em simultâneo através da sua API, a aplicação utiliza atualmente uma "lista fixa" curada para construir opções do menu pendente em vez de despejar a lista inteira na interface.
+
+Se desejar **incluir um modelo novo** ou **remover modelos** do painel que pertencem a estes provedores em nuvem, basta editar livremente um único ficheiro:
+
+👉 **Ficheiro:** `server/src/services/llm.js`
+
+Procure lá dentro a função `listModels(provider)`. Vai encontrar blocos `if/else` configuráveis semelhantes a este:
+
+```javascript
+} else if (provider === 'openrouter') {
+  return [
+    { id: 'qwen/qwen3.6-plus', name: 'Qwen 3.6 Plus', provider: 'openrouter' },
+    // DICA: Para adicionar o seu próprio modelo, basta copiar a estrutura:
+    // { id: 'ID_DO_MODELO_NA_API_DELES', name: 'NOME DE EXIBIÇÃO', provider: 'openrouter' },
+  ];
+}
+```
+*(**Nota:** Esta regra aplica-se aos modelos de Cloud. Provedores locais como o *LM Studio* ou *Ollama / Ollama Cloud* preenchem a sua dropdown **automaticamente**, perguntando de forma dinâmica ao seu Host quais são os modelos que você tem transferidos!).*
+
 ---
 
 ## 🔐 Check de Segurança do Código

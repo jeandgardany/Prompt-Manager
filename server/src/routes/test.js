@@ -91,21 +91,45 @@ router.post('/run', async (req, res) => {
   }
 });
 
-// GET /api/test/runs - List test runs
+// GET /api/test/runs - List test runs with cursor-based pagination
 router.get('/runs', async (req, res) => {
-  const { prompt_id, limit = 20 } = req.query;
+  const { prompt_id, limit = 20, cursor } = req.query;
   try {
     let query = 'SELECT * FROM test_runs';
     const params = [];
+    const conditions = [];
+
     if (prompt_id) {
-      query += ' WHERE prompt_id = $1';
+      conditions.push(`prompt_id = $${params.length + 1}`);
       params.push(prompt_id);
     }
+
+    if (cursor) {
+      conditions.push(`created_at < (SELECT created_at FROM test_runs WHERE id = $${params.length + 1})`);
+      params.push(cursor);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
     query += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1);
-    params.push(parseInt(limit));
+    params.push(parseInt(limit) + 1); // Fetch one extra to determine if there's a next page
 
     const result = await pool.query(query, params);
-    res.json(result.rows);
+
+    const hasMore = result.rows.length > parseInt(limit);
+    const runs = hasMore ? result.rows.slice(0, -1) : result.rows;
+    const nextCursor = hasMore && runs.length > 0 ? runs[runs.length - 1].id : null;
+
+    res.json({
+      runs,
+      pagination: {
+        limit: parseInt(limit),
+        hasMore,
+        nextCursor,
+      }
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

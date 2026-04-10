@@ -104,6 +104,25 @@ CREATE TABLE IF NOT EXISTS dual_run_results (
 CREATE INDEX IF NOT EXISTS idx_dual_runs_prompt ON dual_run_results(prompt_id);
 CREATE INDEX IF NOT EXISTS idx_dual_runs_created ON dual_run_results(created_at DESC);
 
+-- Judge Criteria (configurable evaluation criteria)
+CREATE TABLE IF NOT EXISTS judge_criteria (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    weight INT DEFAULT 1,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Insert default criteria
+INSERT INTO judge_criteria (name, description, weight) VALUES
+    ('Relevância', 'Quão bem responde ao pedido', 2),
+    ('Qualidade', 'Clareza, profundidade e utilidade', 2),
+    ('Criatividade', 'Originalidade e abordagem', 1),
+    ('Precisão', 'Exatidão factual e técnica', 2),
+    ('Tom/Estilo', 'Adequação ao contexto', 1)
+ON CONFLICT DO NOTHING;
+
 -- Seed agents
 INSERT INTO agents (name, description, icon, color) VALUES
     ('AIA', 'Assistente Inteligente de Atendimento', '🧠', '#6366f1'),

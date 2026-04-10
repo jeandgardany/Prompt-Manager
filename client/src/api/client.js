@@ -32,7 +32,12 @@ export const getVersion = (promptId, version) => request(`/prompts/${promptId}/v
 
 // Test
 export const runTest = (data) => request('/test/run', { method: 'POST', body: JSON.stringify(data) });
-export const getTestRuns = (promptId) => request(`/test/runs?prompt_id=${promptId}`);
+export const getTestRuns = (promptId, { limit = 20, cursor } = {}) => {
+  let url = `/test/runs?limit=${limit}`;
+  if (promptId) url += `&prompt_id=${promptId}`;
+  if (cursor) url += `&cursor=${cursor}`;
+  return request(url);
+};
 export const runCompare = (data) => request('/test/compare', { method: 'POST', body: JSON.stringify(data) });
 export const setWinner = (id, data) => request(`/test/compare/${id}/winner`, { method: 'PUT', body: JSON.stringify(data) });
 export const dualRun = (data) => request('/test/dual-run', { method: 'POST', body: JSON.stringify(data) });
@@ -43,6 +48,12 @@ export const getDualRuns = (promptId, limit = 20, offset = 0) =>
   request(`/dual-runs${promptId ? `?prompt_id=${promptId}&limit=${limit}&offset=${offset}` : `?limit=${limit}&offset=${offset}`}`);
 export const getDualRun = (id) => request(`/dual-runs/${id}`);
 export const setDualRunWinner = (id, data) => request(`/dual-runs/${id}/winner`, { method: 'PUT', body: JSON.stringify(data) });
+
+// Judge Criteria
+export const getJudgeCriteria = () => request('/judge-criteria');
+export const createJudgeCriteria = (data) => request('/judge-criteria', { method: 'POST', body: JSON.stringify(data) });
+export const updateJudgeCriteria = (id, data) => request(`/judge-criteria/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteJudgeCriteria = (id) => request(`/judge-criteria/${id}`, { method: 'DELETE' });
 
 // Models
 export const getModels = (provider) => request(`/models/${provider}`);

@@ -1,6 +1,6 @@
 # 🧠 Gestão de Prompts (Prompt Manager)
 
-O **Gestão de Prompts** é uma ferramenta profissional de nível de engenharia de prompts (Prompt Engineering) construída para gerir, criar versões e testar prompts sistémicos contra uma variedade de potentes LLMs do mercado, quer corram localmente no seu computador ou através da Cloud. 
+O **Gestão de Prompts** é uma ferramenta profissional de nível de engenharia de prompts (Prompt Engineering) construída para gerir, criar versões e testar prompts sistémicos contra uma variedade de potentes LLMs do mercado, quer corram localmente no seu computador ou através da Cloud.
 
 A aplicação está dividida num **Backend robusto** alimentado por Node.js/Express e PostgreSQL, suportado por um **Frontend reativo** rápido construído com Vite e React.
 
@@ -12,16 +12,19 @@ A aplicação está dividida num **Backend robusto** alimentado por Node.js/Expr
 - Crie prompts baseados nos Agentes e nos seus casos de uso (AIA, DAIA, Blogs, etc).
 - **Versionamento Dinâmico**: Guarde o histórico das alterações. Modificou uma instrução? Crie a versão `v2`. Nunca perca um prompt que funcionou na perfeição!
 - **Variáveis customizadas**: Suporte para injetar variáveis `{{variavel}}` dinamicamente diretamente na interface, permitindo testar facilmente o mesmo prompt com diferentes contextos de entrada.
+- **Histórico de Testes**: Veja todos os testes anteriores com paginação cursor-based para navegação eficiente.
 
 ### ⚔️ Duelo de Modelos (A/B Testing)
 - Teste o **mesmo prompt** e as **mesmas variáveis** em dois modelos Diferentes Lado-a-Lado.
 - **Execução Paralela vs Sequencial**: Se utilizar modelos de provedores de Cloud, eles correm ao mesmo tempo de forma assíncrona. Se detetar que ambos os modelos selecionados são executados no mesmo prestador local (como o LM Studio), o sistema engata num modo sequencial automático, fazendo warm-up e correndo um após o outro, com pausas pré-definidas para garantir que a memória VRAM do seu dispositivo (ou RAM) respira entre inferências, sem "crashes".
 - **Métricas ao rubro**: Compare instantaneamente a **latência (ms)** e o **consumo de tokens** de cada um.
 - **Inputs Multimodais**: Faça o upload de Imagens localmente para testar modelos de Visão e extração de dados.
+- **Resultados Persistidos**: Todos os duelos são guardados na base de dados para consulta posterior.
 
 ### 🧑‍⚖️ Juiz IA (Avaliação Automática)
 - Precisa de uma opinião imparcial sobre quem respondeu melhor no Duelo Lado-a-Lado? Invoque o botão **"Avaliar com IA"**.
-- Escolha um dos seus modelos mais inteligentes (via OpenRouter por exemplo) para ler ambos os *outputs* (Modelo A vs Modelo B) com base na instrução original, avaliar Critérios de Qualidade e determinar o Vencedor lógico.
+- Escolha um dos seus modelos mais inteligentes (via OpenRouter por exemplo) para ler ambos os *outputs* (Modelo A vs Modelo B) com base na instrução original.
+- **Critérios Configuráveis**: Personalize os critérios de avaliação do Juiz IA (Relevância, Qualidade, Criatividade, Precisão, Tom/Estilo) de acordo com as suas necessidades.
 
 ---
 
@@ -58,19 +61,44 @@ Procure lá dentro a função `listModels(provider)`. Vai encontrar blocos `if/e
 
 ---
 
-## 🔐 Check de Segurança do Código
+## 🔐 Segurança
 
-Foi efetuada uma inspeção e auditoria à segurança do seu repositório aquando do primeiro envio para o GitHub:
+A aplicação inclui várias camadas de proteção para manter as suas chaves de API e dados seguros:
 
-- ✅ **Variáveis ​​de Ambiente isoladas**: Todas as chaves secretas (API Keys de provedores) bem como strings de ligação à base de dados SQL residem inteiramente no seu ficheiro `.env` não versionado. A lógica local chama ativamente `process.env`, prevenindo código em *hard-code* da sua conta.
-- ✅ **Ficheiro `.gitignore` rigoroso**: O seu repositório encontra-se livre de partilha da pasta pesada `node_modules`. O log histórico `.env` nunca foi partilhado com o servidor Cloud do *Git*, estando totalmente blindado à sua máquina original.
-- ✅ **`openrouter_key.json`**: O ficheiro JSON contendo dados do OpenRouter retém **apenas metadados truncados** de limite, data e gastos (ex: `sk-or-v1-49c...645`), e nunca a sua Chave Principal legível integral. Concerne 0 riscos para o projeto estar versionado.
+### ✅ Proteção Implementada
+- **Rate Limiting**: 100 pedidos por 15 minutos por IP, protegendo contra ataques de negação de serviço.
+- **CORS Restritivo**: Apenas permite pedidos de origens configuradas (localhost e domínios autorizados).
+- **Validação de Input**: Verificação de Content-Type e sanitização básica contra XSS.
+- **API Key Opcional**: Camada adicional de autenticação para exposição em rede (ativada via variável de ambiente).
+
+### 🔒 Configuração de Segurança para Rede
+
+Por padrão, o servidor corre em `localhost`. Para exposição em rede local (ex: `HOST=0.0.0.0`), é **altamente recomendado** ativar a autenticação por API Key:
+
+```env
+# server/.env
+API_KEY_REQUIRED=true
+API_KEY=sua-chave-secreta-aqui
+ALLOWED_ORIGINS=http://192.168.1.100:5173
+HOST=0.0.0.0
+```
+
+Ao expor o servidor em `0.0.0.0`, será exibido um aviso de segurança no console a lembrar de ativar a proteção.
+
+### 🔐 Variáveis de Ambiente de Segurança
+
+| Variável | Default | Descrição |
+|----------|---------|-----------|
+| `API_KEY_REQUIRED` | `false` | Ativa autenticação por API Key |
+| `API_KEY` | - | Chave secreta para autenticação |
+| `ALLOWED_ORIGINS` | `localhost` | Lista de origens permitidas (separadas por vírgula) |
+| `NODE_ENV` | `development` | Define comportamento de CORS |
 
 ---
 
 ## 🛠️ Como Iniciar
 
-1. Certifique-se que configurou o seu `.env` dentro da pasta `server/` utilizando o seguinte formato base:
+1. Configure o `.env` dentro da pasta `server/` utilizando o `.env.example` como referência:
    ```env
    DATABASE_URL=postgresql://<user>:<password>@<ip>/<dbname>
    LM_STUDIO_URL=http://.../v1
@@ -78,21 +106,49 @@ Foi efetuada uma inspeção e auditoria à segurança do seu repositório aquand
    OPENROUTER_API_KEY=...
    OLLAMA_URL=http://.../v1
    OLLAMA_CLOUD_URL=.../v1
-   MINIMAX_API_URL=.../v1
    MINIMAX_API_KEY=...
    PORT=3001
+   HOST=localhost
+
+   # Segurança (opcional para rede)
+   API_KEY_REQUIRED=false
+   API_KEY=sua-chave-secreta
+   ALLOWED_ORIGINS=http://localhost:5173
    ```
+
 2. Instalar todas as dependências do Monorepo:
    ```bash
    npm run install:all
    ```
+
 3. Inicialize as tabelas e dados pré-preenchimento SQL (apenas na 1ª vez):
    ```bash
    npm run db:init --prefix server
    ```
+
 4. Correr Servidor e Aplicação Lado-a-Lado:
    ```bash
    npm run dev
    ```
+
+---
+
+## 📡 Endpoints da API
+
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/api/health` | Verificação de saúde da API |
+| GET/POST | `/api/agents` | Gestão de agentes |
+| GET/POST/PUT/DELETE | `/api/prompts` | Gestão de prompts |
+| GET | `/api/prompts/:id/versions` | Histórico de versões |
+| POST | `/api/test/run` | Executar teste |
+| GET | `/api/test/runs` | Listar testes (paginado) |
+| POST | `/api/test/dual-run` | Duelo de modelos |
+| GET | `/api/dual-runs` | Histórico de duelos |
+| PUT | `/api/dual-runs/:id/winner` | Definir vencedor |
+| GET/POST/PUT/DELETE | `/api/judge-criteria` | Critérios do Juiz IA |
+| GET | `/api/models/:provider` | Listar modelos disponíveis |
+
+---
 
 Aproveite ao máximo a suite para encontrar os melhores Prompts Sistêmicos com os modelos ideais!

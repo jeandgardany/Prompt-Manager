@@ -2,7 +2,7 @@
 
 O **Gestão de Prompts** é uma ferramenta profissional de nível de engenharia de prompts (Prompt Engineering) construída para gerir, criar versões e testar prompts sistémicos contra uma variedade de potentes LLMs do mercado, quer corram localmente no seu computador ou através da Cloud.
 
-A aplicação está dividida num **Backend robusto** alimentado por Node.js/Express e PostgreSQL, suportado por um **Frontend reativo** rápido construído com Vite e React.
+A aplicação está dividida num **Backend robusto** alimentado por Node.js/Express e SQLite, suportado por um **Frontend reativo** rápido construído com Vite e React.
 
 ---
 
@@ -100,13 +100,19 @@ Ao expor o servidor em `0.0.0.0`, será exibido um aviso de segurança no consol
 
 1. Configure o `.env` dentro da pasta `server/` utilizando o `.env.example` como referência:
    ```env
-   DATABASE_URL=postgresql://<user>:<password>@<ip>/<dbname>
-   LM_STUDIO_URL=http://.../v1
+   # Database (SQLite - caminho opcional, default: server/db/database.sqlite)
+   # DB_PATH=./db/database.sqlite
+
+   # Provedores LLM
+   LM_STUDIO_URL=http://192.168.1.20:12345/v1
    GLM_API_KEY=...
+   GLM_API_URL=https://open.bigmodel.cn/api/paas/v4
    OPENROUTER_API_KEY=...
-   OLLAMA_URL=http://.../v1
-   OLLAMA_CLOUD_URL=.../v1
+   OLLAMA_URL=http://localhost:11434/v1
+   OLLAMA_CLOUD_URL=https://your-ollama-cloud.com/v1
    MINIMAX_API_KEY=...
+
+   # Servidor
    PORT=3001
    HOST=localhost
 
@@ -114,6 +120,7 @@ Ao expor o servidor em `0.0.0.0`, será exibido um aviso de segurança no consol
    API_KEY_REQUIRED=false
    API_KEY=sua-chave-secreta
    ALLOWED_ORIGINS=http://localhost:5173
+   NODE_ENV=development
    ```
 
 2. Instalar todas as dependências do Monorepo:

@@ -8,6 +8,7 @@ import agentsRouter from './routes/agents.js';
 import promptsRouter from './routes/prompts.js';
 import testRouter from './routes/test.js';
 import modelsRouter from './routes/models.js';
+import dualRunResultsRouter from './routes/dualRunResults.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,6 +24,7 @@ app.use('/api/agents', agentsRouter);
 app.use('/api/prompts', promptsRouter);
 app.use('/api/test', testRouter);
 app.use('/api/models', modelsRouter);
+app.use('/api/dual-runs', dualRunResultsRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {

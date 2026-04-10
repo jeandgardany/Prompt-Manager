@@ -303,7 +303,55 @@ router.post('/dual-run', async (req, res) => {
       ]);
     }
 
+    // Get version info for storage
+    let versionId = null;
+    let versionNumber = version || promptData.current_version;
+    if (version) {
+      versionId = promptData.id;
+    } else {
+      const versionResult = await pool.query(
+        'SELECT id FROM prompt_versions WHERE prompt_id = $1 AND version = $2',
+        [prompt_id, promptData.current_version]
+      );
+      if (versionResult.rows.length > 0) versionId = versionResult.rows[0].id;
+    }
+
+    // Persist dual run results
+    const dualRunResult = await pool.query(
+      `INSERT INTO dual_run_results (
+        prompt_id, prompt_version_id, version_number,
+        provider_a, model_a, provider_b, model_b,
+        variables, input_images,
+        output_a, output_b,
+        tokens_a, tokens_b,
+        latency_a_ms, latency_b_ms,
+        error_a, error_b,
+        sequential
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING *`,
+      [
+        prompt_id,
+        versionId,
+        versionNumber,
+        providerA,
+        modelA,
+        providerB,
+        modelB,
+        JSON.stringify(variables || {}),
+        JSON.stringify(images || []),
+        resultA.output || '',
+        resultB.output || '',
+        resultA.tokensUsed || 0,
+        resultB.tokensUsed || 0,
+        resultA.latencyMs || 0,
+        resultB.latencyMs || 0,
+        resultA.error || null,
+        resultB.error || null,
+        !!sequential,
+      ]
+    );
+
     res.json({
+      id: dualRunResult.rows[0].id,
       sequential: !!sequential,
       promptText: systemPrompt + (userPrompt ? '\n\n' + userPrompt : ''),
       a: { provider: providerA, model: modelA, ...resultA },

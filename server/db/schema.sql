@@ -74,6 +74,36 @@ CREATE INDEX IF NOT EXISTS idx_test_runs_prompt ON test_runs(prompt_id);
 CREATE INDEX IF NOT EXISTS idx_test_runs_version ON test_runs(prompt_version_id);
 CREATE INDEX IF NOT EXISTS idx_ab_prompt ON ab_comparisons(prompt_id);
 
+-- Dual Run Results (persisted A/B model comparisons)
+CREATE TABLE IF NOT EXISTS dual_run_results (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    prompt_id UUID REFERENCES prompts(id) ON DELETE SET NULL,
+    prompt_version_id UUID REFERENCES prompt_versions(id) ON DELETE SET NULL,
+    version_number INT,
+    provider_a VARCHAR(50) NOT NULL,
+    model_a VARCHAR(200) NOT NULL,
+    provider_b VARCHAR(50) NOT NULL,
+    model_b VARCHAR(200) NOT NULL,
+    variables JSONB DEFAULT '{}',
+    input_images JSONB DEFAULT '[]',
+    output_a TEXT,
+    output_b TEXT,
+    tokens_a INT DEFAULT 0,
+    tokens_b INT DEFAULT 0,
+    latency_a_ms INT DEFAULT 0,
+    latency_b_ms INT DEFAULT 0,
+    error_a TEXT,
+    error_b TEXT,
+    winner VARCHAR(1),
+    judge_result TEXT,
+    judge_model VARCHAR(200),
+    sequential BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_dual_runs_prompt ON dual_run_results(prompt_id);
+CREATE INDEX IF NOT EXISTS idx_dual_runs_created ON dual_run_results(created_at DESC);
+
 -- Seed agents
 INSERT INTO agents (name, description, icon, color) VALUES
     ('AIA', 'Assistente Inteligente de Atendimento', '🧠', '#6366f1'),

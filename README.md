@@ -16,7 +16,7 @@ A aplicação está dividida num **Backend robusto** alimentado por Node.js/Expr
 
 ### ⚔️ Duelo de Modelos (A/B Testing)
 - Teste o **mesmo prompt** e as **mesmas variáveis** em dois modelos Diferentes Lado-a-Lado.
-- **Execução Paralela vs Sequencial**: Se utilizar modelos de provedores de Cloud, eles correm ao mesmo tempo de forma assíncrona. Se detetar que ambos os modelos selecionados são executados no mesmo prestador local (como o LM Studio), o sistema engata num modo sequencial automático, fazendo warm-up e correndo um após o outro, com pausas pré-definidas para garantir que a memória VRAM do seu dispositivo (ou RAM) respira entre inferências, sem "crashes".
+- **Execução Paralela vs Sequencial**: Se utilizar modelos de provedores de Cloud, eles correm ao mesmo tempo de forma assíncrona. Se detetar que ambos os modelos selecionados são executados no mesmo prestador local (como o LM Studio), o sistema engata num modo sequencial automático, fazendo warm-up e correndo um após o outro, com pausas pré-definidas para garantir que a memória VRAM do seu dispositivo (ou RAM) respira entre inferências, sem "crashes". Pode também forçar o modo sequencial manualmente passando `sequential: true` no pedido.
 - **Métricas ao rubro**: Compare instantaneamente a **latência (ms)** e o **consumo de tokens** de cada um.
 - **Inputs Multimodais**: Faça o upload de Imagens localmente para testar modelos de Visão e extração de dados.
 - **Resultados Persistidos**: Todos os duelos são guardados na base de dados para consulta posterior.
@@ -35,6 +35,12 @@ A aplicação está dividida num **Backend robusto** alimentado por Node.js/Expr
 - Precisa de uma opinião imparcial sobre quem respondeu melhor no Duelo Lado-a-Lado? Invoque o botão **"Avaliar com IA"**.
 - Escolha um dos seus modelos mais inteligentes (via OpenRouter por exemplo) para ler ambos os *outputs* (Modelo A vs Modelo B) com base na instrução original.
 - **Critérios Configuráveis**: Personalize os critérios de avaliação do Juiz IA (Relevância, Qualidade, Criatividade, Precisão, Tom/Estilo) de acordo com as suas necessidades.
+- **Resultado Persistido**: O veredito do Juiz e o modelo utilizado são guardados juntamente com o vencedor no resultado do duelo.
+
+### 🔀 Comparação A/B de Versões
+- Compare **duas versões diferentes do mesmo prompt** (`v1` vs `v2`) utilizando o mesmo modelo e as mesmas variáveis.
+- Ideal para avaliar se uma alteração no prompt sistémico melhorou ou piorou a qualidade da resposta.
+- **Vencedor Manual**: Após a comparação, defina manualmente qual versão venceu com notas justificativas.
 
 ---
 
@@ -76,10 +82,14 @@ Procure lá dentro a função `listModels(provider)`. Vai encontrar blocos `if/e
 A aplicação inclui várias camadas de proteção para manter as suas chaves de API e dados seguros:
 
 ### ✅ Proteção Implementada
-- **Rate Limiting**: 100 pedidos por 15 minutos por IP, protegendo contra ataques de negação de serviço.
+- **Rate Limiting**: 200 pedidos por 15 minutos por IP (geral) e 30 pedidos por 15 minutos nas rotas de LLM, protegendo contra ataques de negação de serviço.
+- **Helmet**: Headers de segurança HTTP automáticos (CSP, CORS policy, etc.) via middleware `helmet`.
 - **CORS Restritivo**: Apenas permite pedidos de origens configuradas (localhost e domínios autorizados).
 - **Validação de Input**: Verificação de Content-Type e sanitização básica contra XSS.
+- **Limite de Payload**: Body JSON limitado a 10MB para proteger contra payloads excessivos (relevante para uploads de imagens multimodais).
 - **API Key Opcional**: Camada adicional de autenticação para exposição em rede (ativada via variável de ambiente).
+- **Error Handling em Produção**: Erros internos não vazam detalhes técnicos quando `NODE_ENV=production`.
+- **Logging HTTP**: Registo automático de todos os pedidos HTTP via `morgan` (formato `dev` em desenvolvimento, `combined` em produção).
 
 ### 🔒 Configuração de Segurança para Rede
 
@@ -118,9 +128,12 @@ Ao expor o servidor em `0.0.0.0`, será exibido um aviso de segurança no consol
    GLM_API_KEY=...
    GLM_API_URL=https://open.bigmodel.cn/api/paas/v4
    OPENROUTER_API_KEY=...
+   OPENROUTER_URL=https://openrouter.ai/api/v1
    OLLAMA_URL=http://localhost:11434/v1
    OLLAMA_CLOUD_URL=https://your-ollama-cloud.com/v1
+   OLLAMA_CLOUD_API_KEY=...
    MINIMAX_API_KEY=...
+   MINIMAX_API_URL=https://api.minimax.io/v1
 
    # Servidor
    PORT=3001
@@ -148,26 +161,34 @@ Ao expor o servidor em `0.0.0.0`, será exibido um aviso de segurança no consol
    npm run dev
    ```
 
+> **Nota sobre Timeout:** O servidor tem um timeout de 10 minutos (600000ms) para acomodar o carregamento pesado de modelos em provedores locais como o LM Studio, especialmente no modo sequencial. Isto evita que ligações sejam terminadas prematuramente durante inferências longas.
+
 ---
 
 ## 📡 Endpoints da API
 
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
-| GET | `/api/health` | Verificação de saúde da API |
+| GET | `/api/health` | Verificação de saúde da API (retorna estado de segurança) |
 | GET/POST/PUT/DELETE | `/api/agents` | Gestão de agentes (CRUD) |
 | GET/POST/PUT/DELETE | `/api/prompts` | Gestão de prompts (CRUD) |
 | GET | `/api/prompts/:id/versions` | Histórico de versões |
+| GET | `/api/prompts/:id/versions/:version` | Obter versão específica |
 | GET | `/api/prompts/search/query?q=` | Pesquisa de prompts |
 | GET | `/api/prompts/export/all` | Exportar todos os prompts |
 | POST | `/api/prompts/import/all` | Importar prompts |
 | POST | `/api/test/run` | Executar teste (suporta `maxTokens`, `thinkingEnabled`) |
-| GET | `/api/test/runs` | Listar testes (paginado) |
-| POST | `/api/test/dual-run` | Duelo de modelos (suporta `maxTokens`, `thinkingEnabled`) |
+| GET | `/api/test/runs` | Listar testes (paginação cursor-based) |
+| POST | `/api/test/compare` | Comparação A/B de versões do mesmo prompt |
+| PUT | `/api/test/compare/:id/winner` | Definir vencedor da comparação A/B |
+| POST | `/api/test/dual-run` | Duelo de modelos (suporta `maxTokens`, `thinkingEnabled`, `sequential`) |
+| POST | `/api/test/judge` | Avaliação do Juiz IA sobre dois outputs |
 | GET | `/api/dual-runs` | Histórico de duelos (paginado) |
-| PUT | `/api/dual-runs/:id/winner` | Definir vencedor |
+| GET | `/api/dual-runs/:id` | Obter resultado individual de duelo |
+| PUT | `/api/dual-runs/:id/winner` | Definir vencedor e guardar resultado do Juiz |
 | GET/POST/PUT/DELETE | `/api/judge-criteria` | Critérios do Juiz IA |
-| GET | `/api/models/:provider` | Listar modelos (com cache 60s) |
+| GET | `/api/models` | Listar modelos de todos os providers |
+| GET | `/api/models/:provider` | Listar modelos de um provider (com cache 60s) |
 
 ---
 
